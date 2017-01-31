@@ -7,7 +7,7 @@ public class PlayerController : MonoBehaviour {
 
     float groundAcceleration = 15;
     float maxSpeed = 7.5f;
-    public float jumpForce = 750;
+    public float jumpForce = 1000;
     public LayerMask whatIsGround;
     float moveX;
     bool facingRight = true;
@@ -22,6 +22,7 @@ public class PlayerController : MonoBehaviour {
     /*Get the value for this variable using the editor!
      * No coding required! */ 
     public GameObject littleMario;
+	public Transform platform;
     GameObject superMario;
     bool super;
     bool little;
@@ -67,11 +68,10 @@ public class PlayerController : MonoBehaviour {
     void FixedUpdate() {
         anim.SetFloat("Speed", Mathf.Abs(rb.velocity.x));
         anim.SetFloat("vSpeed", Mathf.Abs(rb.velocity.y));
-        /* Make Mario switch directions!
-         * 
-         * YOUR CODE HERE
-         * 
-         */
+		if ((Input.GetKey("left") && facingRight)||(Input.GetKey("right") && !facingRight))
+		{
+			Flip();
+		}
         myState.FixedUpdate();
         if (nextState != null)
         {
@@ -94,11 +94,22 @@ public class PlayerController : MonoBehaviour {
     }
 
     bool CheckForGround() {
-        Vector2 origin = new Vector2(rb.position.x + 0.5f, rb.position.y + 1);
-        RaycastHit2D hit = Physics2D.Raycast(origin, Vector2.down, 1.2f, whatIsGround);
-        Debug.DrawRay(origin, Vector2.down * 1.2f);
-        return hit.collider != null;
+		SpriteRenderer mySprite = GetComponent<SpriteRenderer>();
+		float castHeight = mySprite.sprite.bounds.size.y / 2 + 0.25f;
+		Vector3 origin = new Vector3(transform.position.x, transform.position.y);
+		RaycastHit2D hit = Physics2D.Raycast(origin, Vector3.down, castHeight, whatIsGround);
+		Debug.DrawRay(origin, Vector3.down * castHeight);
+		return hit.collider != null;
     }
+
+	bool CheckForSpace() {
+		SpriteRenderer mySprite = GetComponent<SpriteRenderer> ();
+		float castHeight = mySprite.sprite.bounds.size.y / 2 + 1.25f;
+		Vector3 origin = new Vector3(transform.position.x, transform.position.y);
+		RaycastHit2D hit = Physics2D.Raycast(origin, Vector3.down, castHeight, whatIsGround);
+		Debug.DrawRay(origin, Vector3.down * castHeight);
+		return hit.collider == null;
+	}
 
     void Duck()
     {
@@ -236,7 +247,7 @@ public class PlayerController : MonoBehaviour {
         float jumpingTime = 1;
         float maxSpeed;
         float airHorizAcceleration = 5;
-        float airJumpAcceleration = 13;
+        float airJumpAcceleration = 50;
 
         public Jumping(PlayerController controller)
         {
@@ -251,22 +262,18 @@ public class PlayerController : MonoBehaviour {
         public void Enter()
         {
             moveJump = Input.GetAxis("Jump");
-            moveX = Input.GetAxis("Horizontal");
-            /* Add the preliminary jump force.
-             * 
-             * YOUR CODE HERE.
-             * 
-             */ 
+            moveX = Input.GetAxis("Horizontal"); 
+			if (Input.GetButton("Jump"))
+			{
+				rb.AddForce (new Vector2 (0, jumpForce * moveJump));	
+			}
             anim.SetBool("Jumping", true);
         }
 
         public void Update()
         {
-            /* Get the two input variables. 
-             * 
-             * YOUR CODE HERE.
-             * 
-             */ 
+			moveJump = Input.GetAxis("Jump");
+			moveX = Input.GetAxis("Horizontal");
         }
 
         public void FixedUpdate()
@@ -275,21 +282,17 @@ public class PlayerController : MonoBehaviour {
              * the player is not allowed to add any more
              * force to the jump. */
             jumpingTime -= Time.deltaTime;
-            /* 1. Add horizontal control in the air. Make sure the player 
-             * is not over the maximum speed. 
-             * 2. Add extra vertical force while the player holds down
-             * space bar. Make sure not to add force after jumpingTime 
-             * has reached 0. 
-             *
-             * YOUR CODE HERE.
-             * 
-             */
-            /* Continuously check that you haven't hit the ground. If
-             * you have, then transition to the 'Grounded' state.*/
+			if (jumpingTime > 0 && Input.GetButton ("Jump")) {
+				rb.AddForce (new Vector2 (0, airJumpAcceleration));
+			}
+			if (Mathf.Abs(rb.velocity.x) <= maxSpeed) {
+				rb.AddForce (new Vector2 (moveX * airHorizAcceleration, 0));
+			}
             if (controller.CheckForGround())
             {
                 controller.stateEnded = true;
             }
+
         }
 
         public void Exit()
@@ -300,6 +303,11 @@ public class PlayerController : MonoBehaviour {
 
         public PlayerState HandleInput()
         {
+			if (Input.GetButton("Platform") && controller.CheckForSpace())
+			{
+				print (rb.position.y);
+				Instantiate(controller.platform, new Vector3(rb.position.x+0.5f, rb.position.y-1f, 0), Quaternion.identity);
+			}
             if (controller.stateEnded)
             {
                 return new Grounded(controller);
